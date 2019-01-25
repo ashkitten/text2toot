@@ -260,4 +260,7 @@ app.post("/push", async (req, res) => {
 
 http.createServer(app).listen(config.port, () => {
     console.log(`listening for webhook requests on port ${config.port}`);
+    if (config.debug) {
+        console.log("WARNING: debug mode enabled, requests will not be validated");
+    }
 });
