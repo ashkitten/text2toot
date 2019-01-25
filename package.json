@@ -1,0 +1,23 @@
+{
+  "name": "text2toot",
+  "version": "0.1.0",
+  "description": "post toots via sms/mms, in conjunction with twilio",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "author": "ash lea <ashlea@protonmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "body-parser": "^1.18.3",
+    "express": "^4.16.4",
+    "http_ece": "^1.0.5",
+    "proper-lockfile": "^3.2.0",
+    "raw-body": "^2.3.3",
+    "request": "^2.88.0",
+    "request-promise-native": "^1.0.5",
+    "striptags": "^3.1.1",
+    "twilio": "^3.27.1",
+    "urlsafe-base64": "^1.0.0"
+  }
+}
