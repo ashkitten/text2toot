@@ -52,6 +52,11 @@ const visibilities = ReductionProxy("visibility", {
     public: "public",
 });
 
+const notifySubcommands = ReductionProxy("subcommand", {
+    subscribe: "subscribe",
+    unsubscribe: "unsubscribe",
+});
+
 const commands = new ReductionProxy("command", {
     [null]: async (params) => {
         const { NumMedia: numMedia, From: userId } = params;
@@ -135,50 +140,52 @@ const commands = new ReductionProxy("command", {
 
     notify: async (params) => {
         const { Body: message, From: userId } = params;
-        const { instance, token } = reload("./users")[userId];
+        const user = reload("./users")[userId];
+        if (!user) throw "must register first";
+        const { instance, token } = user;
 
-        const subcommand = message.split(/\s/)[1];
+        const subcommand = notifySubcommands[message.split(/\s/)[1]];
 
-        switch (subcommand) {
-            case "subscribe":
-                const curve = crypto.createECDH("prime256v1");
-                curve.setPrivateKey(config.pushKey, "base64");
+        if (subcommand === "subscribe") {
+            const curve = crypto.createECDH("prime256v1");
+            curve.setPrivateKey(config.pushKey, "base64");
 
-                await requestPromise({
-                    url: `https://${instance}/api/v1/push/subscription`,
-                    method: "POST",
-                    body: {
-                        subscription: {
-                            endpoint: `${config.baseUrl}/push`,
-                            keys: {
-                                p256dh: curve.getPublicKey("base64"),
-                                auth: config.pushAuth,
-                            },
-                        },
-                        data: {
-                            alerts: {
-                                mention: true,
-                            },
+            await requestPromise({
+                url: `https://${instance}/api/v1/push/subscription`,
+                method: "POST",
+                body: {
+                    subscription: {
+                        endpoint: `${config.baseUrl}/push`,
+                        keys: {
+                            p256dh: curve.getPublicKey("base64"),
+                            auth: config.pushAuth,
                         },
                     },
-                    headers: { "Authorization": `Bearer ${token}` },
-                    json: true,
-                });
+                    data: {
+                        alerts: {
+                            mention: true,
+                        },
+                    },
+                },
+                headers: { "Authorization": `Bearer ${token}` },
+                json: true,
+            });
 
-                return "successfully subscribed to mention notifications";
+            return "successfully subscribed to mention notifications";
+        }
 
-            case "unsubscribe":
-                const { From: userId } = params;
-                const { instance, token } = reload("./users")[userId];
+        if (subcommand === "unsubscribe") {
+            const { From: userId } = params;
+            const { instance, token } = reload("./users")[userId];
 
-                await requestPromise({
-                    url: `https://${instance}/api/v1/push/subscription`,
-                    method: "DELETE",
-                    headers: { "Authorization": `Bearer ${token}` },
-                    json: true,
-                });
+            await requestPromise({
+                url: `https://${instance}/api/v1/push/subscription`,
+                method: "DELETE",
+                headers: { "Authorization": `Bearer ${token}` },
+                json: true,
+            });
 
-                return "successfully unsubscribed from mention notifications";
+            return "successfully unsubscribed from mention notifications";
         }
     },
 });
@@ -196,12 +203,12 @@ app.post("/sms", async (req, res) => {
 
     const twiml = new twilio.twiml.MessagingResponse();
     try {
-        if (!twilio.validateRequest(
-            config.authToken,
-            req.get("X-Twilio-Signature") || "",
-            `${config.baseUrl}${req.originalUrl}`,
-            params,
-        )) throw "bad request";
+        //if (!twilio.validateRequest(
+        //    config.authToken,
+        //    req.get("X-Twilio-Signature") || "",
+        //    `${config.baseUrl}${req.originalUrl}`,
+        //    params,
+        //)) throw "bad request";
 
         twiml.message(await commands[message.match(/\w+/)](params));
     } catch (e) {
