@@ -203,12 +203,12 @@ app.post("/sms", async (req, res) => {
 
     const twiml = new twilio.twiml.MessagingResponse();
     try {
-        //if (!twilio.validateRequest(
-        //    config.authToken,
-        //    req.get("X-Twilio-Signature") || "",
-        //    `${config.baseUrl}${req.originalUrl}`,
-        //    params,
-        //)) throw "bad request";
+        if (!config.debug && !twilio.validateRequest(
+            config.authToken,
+            req.get("X-Twilio-Signature") || "",
+            `${config.baseUrl}${req.originalUrl}`,
+            params,
+        )) throw "bad request";
 
         twiml.message(await commands[message.match(/\w+/)](params));
     } catch (e) {
