@@ -119,8 +119,9 @@ const commands = new ReductionProxy("command", {
         if (!user) throw new CommandError("must register first");
         const { instance, token, mediaIds } = user;
 
+        let vis, cw, text;
         try {
-            let [, vis = "public", cw, text] = input.match(/\w+(?:\.(\w+))?(?:\[\[(.*?)\]\])?\s+([\s\S]*)/);
+            [, vis = "public", cw, text] = input.match(/\w+(?:\.(\w+))?(?:\[\[(.*?)\]\])?\s+([\s\S]*)/);
         } catch (e) {
             return "syntax: post.visibility[[cw]] text...";
         }
