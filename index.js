@@ -16,6 +16,9 @@ const urlUtil = require("url");
 
 const config = require("./config");
 
+// https://github.com/nodejs/node/issues/16196#issuecomment-393091912
+require("tls").DEFAULT_ECDH_CURVE = "auto";
+
 function reload(module) {
     delete require.cache[require.resolve(module)];
     return require(module);
