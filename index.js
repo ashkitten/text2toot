@@ -64,6 +64,7 @@ function ReductionProxy(name, target) {
 }
 
 const visibilities = ReductionProxy("visibility", {
+    undefined: undefined,
     direct: "direct",
     private: "private",
     unlisted: "unlisted",
@@ -121,7 +122,7 @@ const commands = new ReductionProxy("command", {
 
         let vis, cw, text;
         try {
-            [, vis = "public", cw, text] = input.match(/\w+(?:\.(\w+))?(?:\[\[(.*?)\]\])?\s+([\s\S]*)/);
+            [, vis, cw, text] = input.match(/\w+(?:\.(\w+))?(?:\[\[(.*?)\]\])?\s+([\s\S]*)/);
         } catch (e) {
             return "syntax: post.visibility[[cw]] text...";
         }
