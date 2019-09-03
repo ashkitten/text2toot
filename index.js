@@ -124,7 +124,7 @@ const commands = new ReductionProxy("command", {
         try {
             [, vis, cw, text] = input.match(/\w+(?:\.(\w+))?(?:\[\[(.*?)\]\])?\s+([\s\S]*)/);
         } catch (e) {
-            return "syntax: post.visibility[[cw]] text...";
+            throw new CommandError("syntax: post.visibility[[cw]] text...");
         }
 
         const status = await requestPromise({
@@ -141,9 +141,34 @@ const commands = new ReductionProxy("command", {
         return status.url;
     },
 
+    delete: async (params) => {
+        const { Body: input, From: userId } = params;
+        const user = getUser(userId);
+        if (!user) throw new CommandError("must register first");
+        const { instance, token } = user;
+
+        let id;
+        try {
+            // bad matcher for url or bare id
+            id = input.match(/\w+\s+(?:http.*\/)?([0-9]+)/)[1];
+        } catch (e) {
+            throw new CommandError("syntax: delete <id>");
+        }
+
+        const result = await requestPromise({
+            url: `https://${instance}/api/v1/statuses/${id}`,
+            method: "DELETE",
+            headers: { "Authorization": `Bearer ${token}` },
+        });
+        if (result.error) throw new CommandError(result.error);
+
+        return "successfully deleted";
+    },
+
+
     register: async (params) => {
         const { Body: message, From: userId } = params;
-        const [, instance, token] = message.split(/\s/);
+        const [, instance, token] = message.split(/\s+/);
 
         writeUserData(userId, { instance, token });
 
@@ -156,7 +181,7 @@ const commands = new ReductionProxy("command", {
         if (!user) throw new CommandError("must register first");
         const { instance, token } = user;
 
-        const subcommand = notifySubcommands[message.split(/\s/)[1]];
+        const subcommand = notifySubcommands[message.split(/\s+/)[1]];
 
         if (subcommand === "subscribe") {
             const curve = crypto.createECDH("prime256v1");
