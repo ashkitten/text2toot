@@ -19,6 +19,9 @@ const config = require("./config");
 // https://github.com/nodejs/node/issues/16196#issuecomment-393091912
 require("tls").DEFAULT_ECDH_CURVE = "auto";
 
+class CommandError extends Error {}
+class ReductionError extends Error {}
+
 function reload(module) {
     delete require.cache[require.resolve(module)];
     return require(module);
@@ -53,8 +56,8 @@ function ReductionProxy(name, target) {
     return new Proxy(target, {
         get: (obj, prop) => {
             const matches = Array.from(Object.keys(obj).filter(key => key.startsWith(prop)));
-            if (matches.length > 1) throw `${prop} is ambiguous as a ${name}`;
-            if (matches.length < 1) throw `${prop} is not a valid ${name}`;
+            if (matches.length > 1) throw new ReductionError(`${prop} is ambiguous as a ${name}`);
+            if (matches.length < 1) throw new ReductionError(`${prop} is not a valid ${name}`);
             return obj[matches[0]];
         },
     });
@@ -73,11 +76,11 @@ const notifySubcommands = ReductionProxy("subcommand", {
 });
 
 const commands = new ReductionProxy("command", {
-    [null]: async (params) => {
+    null: async (params) => {
         const { NumMedia: numMedia, From: userId } = params;
-        if (!numMedia) throw "must attach media or provide a command";
+        if (!numMedia) throw new CommandError("must attach media or provide a command");
         const user = getUser(userId);
-        if (!user) throw "must register first";
+        if (!user) throw new CommandError("must register first");
         const { instance, token, mediaIds = [] } = user;
 
         Array.prototype.push.apply(mediaIds, await Promise.all(range(numMedia).map(async i => {
@@ -96,7 +99,7 @@ const commands = new ReductionProxy("command", {
                 headers: { "Authorization": `Bearer ${token}` },
                 json: true,
             });
-            if (attachment.error) throw attachment.error;
+            if (attachment.error) throw new CommandError(attachment.error);
             else return attachment.id;
         })));
 
@@ -113,10 +116,14 @@ const commands = new ReductionProxy("command", {
     post: async (params) => {
         const { Body: input, From: userId } = params;
         const user = getUser(userId);
-        if (!user) throw "must register first";
+        if (!user) throw new CommandError("must register first");
         const { instance, token, mediaIds } = user;
 
-        let [, vis = "public", cw, text] = input.match(/\w+(?:\.(\w+))?(?:\[\[(.*?)\]\])?\s+([\s\S]*)/);
+        try {
+            let [, vis = "public", cw, text] = input.match(/\w+(?:\.(\w+))?(?:\[\[(.*?)\]\])?\s+([\s\S]*)/);
+        } catch (e) {
+            return "syntax: post.visibility[[cw]] text...";
+        }
 
         const status = await requestPromise({
             url: `https://${instance}/api/v1/statuses`,
@@ -125,7 +132,7 @@ const commands = new ReductionProxy("command", {
             headers: { "Authorization": `Bearer ${token}` },
             json: true,
         });
-        if (status.error) throw status.error;
+        if (status.error) throw new CommandError(status.error);
 
         writeUserData(userId, { mediaIds: [] });
 
@@ -144,7 +151,7 @@ const commands = new ReductionProxy("command", {
     notify: async (params) => {
         const { Body: message, From: userId } = params;
         const user = getUser(userId);
-        if (!user) throw "must register first";
+        if (!user) throw new CommandError("must register first");
         const { instance, token } = user;
 
         const subcommand = notifySubcommands[message.split(/\s/)[1]];
@@ -215,8 +222,12 @@ app.post("/sms", async (req, res) => {
 
         twiml.message(await commands[message.match(/\w+/)](params));
     } catch (e) {
-        console.log(e);
-        twiml.message(`error: ${e.toString()}`);
+        if (e instanceof CommandError || e instanceof ReductionError) {
+            twiml.message(e.message);
+        } else {
+            console.log(e);
+            twiml.message("an error occurred");
+        }
     }
 
     res.writeHead(200, { "Content-Type": "text/xml" });
