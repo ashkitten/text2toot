@@ -63,18 +63,21 @@ function ReductionProxy(name, target) {
     });
 }
 
-const visibilities = ReductionProxy("visibility", {
-    undefined: undefined,
-    direct: "direct",
-    private: "private",
-    unlisted: "unlisted",
-    public: "public",
-});
+function IdentityReductionProxy(name, target) {
+    return new Proxy(target, {
+        get: (obj, prop) => {
+            // FIXME: remove hack for undefined visibility
+            // we shouldn't need to convert key to string here
+            const matches = target.filter(key => String(key).startsWith(prop));
+            if (matches.length > 1) throw `${prop} is ambiguous as a ${name}`;
+            if (matches.length < 1) throw `${prop} is not a valid ${name}`;
+            return matches[0];
+        }
+    });
+}
 
-const notifySubcommands = ReductionProxy("subcommand", {
-    subscribe: "subscribe",
-    unsubscribe: "unsubscribe",
-});
+const visibilities = new IdentityReductionProxy("visibility", [ undefined, "direct", "private", "unlisted", "public" ]);
+const notifySubcommands = new IdentityReductionProxy("subcommand", [ "subscribe", "unsubscribe" ]);
 
 const commands = new ReductionProxy("command", {
     null: async (params) => {
@@ -247,7 +250,7 @@ app.post("/sms", async (req, res) => {
             params,
         )) throw "bad request";
 
-        twiml.message(await commands[message.match(/\w+/)](params));
+        twiml.message(await commands[message.match(/\w+/).toLowerCase()](params));
     } catch (e) {
         if (e instanceof CommandError || e instanceof ReductionError) {
             twiml.message(e.message);
