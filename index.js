@@ -30,6 +30,18 @@ async function writeJson(file, obj) {
     await release();
 }
 
+function getUser(userId) {
+    return reload("./users")[userId];
+}
+
+function writeUserData(userId, data) {
+    let users = reload("./users");
+    users = Object.assign(users, {
+        [userId]: Object.assign(users[userId], data),
+    });
+    writeJson("./users.json", users);
+}
+
 function range(...args) {
     start = args.length > 1 ? args[0] : 0;
     end   = args.length > 1 ? args[1] : args[0];
@@ -64,7 +76,7 @@ const commands = new ReductionProxy("command", {
     [null]: async (params) => {
         const { NumMedia: numMedia, From: userId } = params;
         if (!numMedia) throw "must attach media or provide a command";
-        const user = reload("./users")[userId];
+        const user = getUser(userId);
         if (!user) throw "must register first";
         const { instance, token, mediaIds = [] } = user;
 
@@ -88,25 +100,19 @@ const commands = new ReductionProxy("command", {
             else return attachment.id;
         })));
 
-        const users = Object.assign(reload("./users"), {
-            [userId]: Object.assign(user, { mediaIds }),
-        });
-        await writeJson("./users.json", users);
+        writeUserData(userId, { mediaIds });
 
         return "media uploaded";
     },
 
     clear_media: async (params) => {
         const { From: userId } = params;
-        const users = Object.assign(reload("./users"), {
-            [userId]: Object.assign(user, { mediaIds: [] }),
-        });
-        await writeJson("./users.json", users);
+        writeUserData(userId, { mediaIds: [] });
     },
 
     post: async (params) => {
         const { Body: input, From: userId } = params;
-        const user = reload("./users")[userId];
+        const user = getUser(userId);
         if (!user) throw "must register first";
         const { instance, token, mediaIds } = user;
 
@@ -121,10 +127,7 @@ const commands = new ReductionProxy("command", {
         });
         if (status.error) throw status.error;
 
-        const users = Object.assign(reload("./users"), {
-            [userId]: Object.assign(user, { mediaIds: [] }),
-        });
-        await writeJson("./users.json", users);
+        writeUserData(userId, { mediaIds: [] });
 
         return status.url;
     },
@@ -133,17 +136,14 @@ const commands = new ReductionProxy("command", {
         const { Body: message, From: userId } = params;
         const [, instance, token] = message.split(/\s/);
 
-        const users = Object.assign(reload("./users"), {
-            [userId]: { instance, token },
-        });
-        await writeJson("./users.json", users);
+        writeUserData(userId, { instance, token });
 
         return "registration success";
     },
 
     notify: async (params) => {
         const { Body: message, From: userId } = params;
-        const user = reload("./users")[userId];
+        const user = getUser(userId);
         if (!user) throw "must register first";
         const { instance, token } = user;
 
@@ -179,7 +179,7 @@ const commands = new ReductionProxy("command", {
 
         if (subcommand === "unsubscribe") {
             const { From: userId } = params;
-            const { instance, token } = reload("./users")[userId];
+            const { instance, token } = getUser(userId);
 
             await requestPromise({
                 url: `https://${instance}/api/v1/push/subscription`,
