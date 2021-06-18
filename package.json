@@ -16,7 +16,7 @@
     "raw-body": "^2.4.1",
     "request": "^2.88.0",
     "request-promise-native": "^1.0.7",
-    "striptags": "^3.1.1",
+    "striptags": "^3.2.0",
     "twilio": "^3.33.4",
     "urlsafe-base64": "^1.0.0"
   }
